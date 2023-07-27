@@ -1,0 +1,18 @@
+For object detection, 10 classes are evaluated. They are:
+
+1: pedestrian
+2: rider
+3: car
+4: truck
+5: bus
+6: train
+7: motorcycle
+8: bicycle
+-----------------
+9: traffic light
+10: traffic sign
+
+Note that, the field category_id range from 1 instead of 0.
+
+Instance Segmentation, Box Tracking, Segmentation Tracking
+For instance segmentation, multi object tracking (box tracking), and multi object tracking and segmentation (segmentation tracking), only the first 8 classes are used and evaluated.

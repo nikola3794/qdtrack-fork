@@ -191,6 +191,9 @@ class QDTrack(BaseDetector):
                     out_file=None,
                     wait_time=0,
                     backend='cv2',
+                    gaze_xy=None,
+                    awareness_map=None,
+                    radius_tres=1.0,
                     **kwargs):
         """Visualize tracking results.
 
@@ -227,7 +230,11 @@ class QDTrack(BaseDetector):
             show=show,
             out_file=out_file,
             wait_time=wait_time,
-            backend=backend)
+            backend=backend,
+            gaze_xy=gaze_xy,
+            awareness_map=awareness_map,
+            radius_tres=radius_tres,
+        )
         return img
 
     def extract_feat(self, imgs):

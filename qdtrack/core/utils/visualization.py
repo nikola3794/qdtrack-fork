@@ -28,7 +28,7 @@ def imshow_tracks(*args, backend='cv2', **kwargs):
     else:
         raise NotImplementedError()
 
-
+    
 def _cv2_show_tracks(img,
                      bboxes,
                      labels,
@@ -38,7 +38,10 @@ def _cv2_show_tracks(img,
                      font_scale=0.4,
                      show=False,
                      wait_time=0,
-                     out_file=None):
+                     out_file=None,
+                     gaze_xy=None,
+                     awareness_map=None,
+                     radius_tres=1.0,):
     """Show the tracks with opencv."""
     assert bboxes.ndim == 2
     assert labels.ndim == 1
@@ -57,37 +60,64 @@ def _cv2_show_tracks(img,
         x1, y1, x2, y2 = bbox[:4].astype(np.int32)
         score = float(bbox[-1])
 
-        # bbox
-        bbox_color = random_color(id)
-        bbox_color = [int(255 * _c) for _c in bbox_color][::-1]
-        cv2.rectangle(img, (x1, y1), (x2, y2), bbox_color, thickness=thickness)
+        # # bbox
+        if awareness_map is None:
+            bbox_color = random_color(id)
+            bbox_color = [int(255 * _c) for _c in bbox_color][::-1]
+            cv2.rectangle(img, (x1, y1), (x2, y2), bbox_color, thickness=thickness)
+            draw = True
+        elif awareness_map[id]['gazed'] == 0.0:
+            draw = False
+        elif awareness_map[id]['gazed'] == 1.0:
+            bbox_color = random_color(id)
+            bbox_color = [int(255 * _c) for _c in bbox_color][::-1]
+            cv2.rectangle(img, (x1, y1), (x2, y2), bbox_color, thickness=thickness)
+            draw = True
+        else:
+            # Generate output by blending image with shapes image, using the shapes
+            # images also as mask to limit the blending to those parts
+            bbox_color = random_color(id)
+            bbox_color = [int(255 * _c) for _c in bbox_color][::-1]
+            shapes = np.zeros_like(img, np.uint8)
+            cv2.rectangle(shapes, (x1, y1), (x2, y2), bbox_color, cv2.FILLED)
+            mask = shapes.astype(bool)
+            alpha = awareness_map[id]['gazed'] / 15.0
+            alpha = np.clip(alpha, 0.01, 0.99)
+            img[mask] = cv2.addWeighted(img, 1 - alpha, shapes, alpha, 0)[mask]
+            draw = True
 
-        # id
-        text = str(id)
-        width = len(text) * text_width
-        img[y1:y1 + text_height, x1:x1 + width, :] = bbox_color
-        cv2.putText(
-            img,
-            str(id), (x1, y1 + text_height - 2),
-            cv2.FONT_HERSHEY_COMPLEX,
-            font_scale,
-            color=(0, 0, 0))
+        if draw:
+            # id
+            text = str(id)
+            width = len(text) * text_width
+            img[y1:y1 + text_height, x1:x1 + width, :] = bbox_color
+            cv2.putText(
+                img,
+                str(id), (x1, y1 + text_height - 2),
+                cv2.FONT_HERSHEY_COMPLEX,
+                font_scale,
+                color=(0, 0, 0))
 
-        # score
-        text = '{:.02f}'.format(score)
-        width = len(text) * text_width
-        img[y1 - text_height:y1, x1:x1 + width, :] = bbox_color
-        cv2.putText(
-            img,
-            text, (x1, y1 - 2),
-            cv2.FONT_HERSHEY_COMPLEX,
-            font_scale,
-            color=(0, 0, 0))
+            # score
+            text = '{:.02f}'.format(score)
+            width = len(text) * text_width
+            img[y1 - text_height:y1, x1:x1 + width, :] = bbox_color
+            cv2.putText(
+                img,
+                text, (x1, y1 - 2),
+                cv2.FONT_HERSHEY_COMPLEX,
+                font_scale,
+                color=(0, 0, 0))
+        
+    if gaze_xy is not None:
+        cv2.circle(img, center=tuple(gaze_xy.astype(np.int64)), radius=int(radius_tres), color=(0,0,255), thickness=8)
 
     if show:
         mmcv.imshow(img, wait_time=wait_time)
     if out_file is not None:
         mmcv.imwrite(img, out_file)
+
+    #cv2.imwrite('tmp.jpg', img)
 
     return img
 

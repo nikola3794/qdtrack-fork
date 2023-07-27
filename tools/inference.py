@@ -2,6 +2,7 @@ import os
 import os.path as osp
 import tempfile
 from argparse import ArgumentParser
+import json
 
 import mmcv
 
@@ -10,11 +11,14 @@ from qdtrack.apis import inference_model, init_model
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument('config', help='config file')
-    parser.add_argument('--input', help='input video file or folder')
-    parser.add_argument(
-        '--output', help='output video file (mp4 format) or folder')
-    parser.add_argument('--checkpoint', help='checkpoint file')
+    parser.add_argument('--config', help='config file', 
+                        default='configs/aegis/qdtrack-frcnn_r50_fpn_12e_aegis.py')
+    parser.add_argument('--input', help='input video file or folder', 
+                        default='/srv/beegfs02/scratch/aegis_cvl/data/nikola/aegis_rides/2023-07-04_15-15-04-fdf08a6e/1bf99e7a_0.0-133.421.mp4')
+    parser.add_argument('--output', help='output video file (mp4 format) or folder', 
+                        default='/srv/beegfs02/scratch/aegis_cvl/data/nikola/aegis_rides/2023-07-04_15-15-04-fdf08a6e/qd_tracker_output.mp4')
+    parser.add_argument('--checkpoint', help='checkpoint file', 
+                        default='/srv/beegfs02/scratch/aegis_cvl/data/nikola/code/qdtrack-frcnn_r50_fpn_12e_bdd100k-13328aed.pth')
     parser.add_argument(
         '--score-thr',
         type=float,
@@ -31,7 +35,7 @@ def main():
         choices=['cv2', 'plt'],
         default='cv2',
         help='the backend to visualize the results')
-    parser.add_argument('--fps', help='FPS of the output video')
+    parser.add_argument('--fps', help='FPS of the output video', default=20)
     args = parser.parse_args()
     assert args.output or args.show
     # load images
@@ -70,11 +74,20 @@ def main():
     model = init_model(args.config, args.checkpoint, device=args.device)
 
     prog_bar = mmcv.ProgressBar(len(imgs))
-    # test and show/save the images
+    # test and show/save the image
+    tracking_res = []
     for i, img in enumerate(imgs):
+        # if i == 100:
+        #     break        
+        if i == 60:
+            a = 1
         if isinstance(img, str):
             img = osp.join(args.input, img)
         result = inference_model(model, img, frame_id=i)
+
+        track_res_i = [result['track_results'][j].tolist() for j, _ in enumerate(result['track_results'])]
+        tracking_res.append(track_res_i)
+
         if args.output is not None:
             if IN_VIDEO or OUT_VIDEO:
                 out_file = osp.join(out_path, f'{i:06d}.jpg')
@@ -91,6 +104,11 @@ def main():
             out_file=out_file,
             backend=args.backend)
         prog_bar.update()
+
+    output_dir = os.path.dirname(args.output)
+    output_json = os.path.join(output_dir, 'track_results.json')
+    with open(output_json, 'w') as fh:
+        json.dump(tracking_res, fh)
 
     if args.output and OUT_VIDEO:
         print(f'making the output video at {args.output} with a FPS of {fps}')
